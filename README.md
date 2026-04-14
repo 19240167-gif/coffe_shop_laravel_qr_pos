@@ -1,66 +1,103 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Coffee Shop Laravel QR POS
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi kasir restoran berbasis Laravel dengan dua antarmuka utama:
 
-## About Laravel
+- Dashboard admin/kasir untuk manajemen menu, stok, meja QR, dan status pesanan.
+- Halaman pelanggan berbasis QR per meja untuk pemesanan instan via smartphone.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Fitur Utama
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Manajemen menu: nama, slug, harga, stok, status aktif.
+- Manajemen stok: tambah, kurangi, dan set langsung (dengan histori pergerakan stok).
+- Manajemen meja: kode meja dan token QR unik otomatis.
+- Pemesanan pelanggan: pilih item, jumlah, catatan, kirim pesanan.
+- Workflow pesanan: pending, confirmed, preparing, ready, completed, cancelled.
+- Real-time ready: event pesanan baru dan perubahan status via broadcasting (Pusher-compatible).
+- UI responsive: layout mobile-first untuk pelanggan dan dashboard kasir.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Struktur Domain Data
 
-## Learning Laravel
+- `users`: user admin/kasir dengan kolom role.
+- `menu_items`: data menu dan stok.
+- `table_seats`: data meja dan token QR.
+- `orders`: header pesanan.
+- `order_items`: detail item pesanan.
+- `stock_movements`: histori penyesuaian stok.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Setup Cepat
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+1. Install dependency backend:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+composer install
+```
 
-## Laravel Sponsors
+2. Install dependency frontend:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+npm install
+```
 
-### Premium Partners
+3. Buat file environment:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+```bash
+copy .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+4. Atur koneksi database MySQL pada `.env`, lalu jalankan:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan migrate --seed
+```
 
-## Code of Conduct
+5. Jalankan server aplikasi:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan serve
+npm run dev
+```
 
-## Security Vulnerabilities
+Buka:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- Halaman login staf: `http://127.0.0.1:8000/login`
+- Dashboard kasir (butuh login): `http://127.0.0.1:8000/dashboard`
+- Link pelanggan per meja: tersedia di panel `Daftar Meja` pada dashboard
 
-## License
+## Demo Akun Seed
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Setelah `php artisan migrate --seed`:
+
+- Admin: `admin@beanflow.local` / `password`
+- Kasir: `kasir@beanflow.local` / `password`
+
+## Aktivasi Real-Time Pusher
+
+Secara default, `.env.example` memakai `BROADCAST_DRIVER=log` agar aman untuk lokal.
+Untuk real-time penuh:
+
+1. Ganti di `.env`:
+
+```env
+BROADCAST_DRIVER=pusher
+```
+
+2. Isi kredensial Pusher:
+
+```env
+PUSHER_APP_ID=...
+PUSHER_APP_KEY=...
+PUSHER_APP_SECRET=...
+PUSHER_APP_CLUSTER=...
+```
+
+3. Restart aplikasi dan Vite.
+
+Dashboard akan berlangganan channel `orders` menggunakan Laravel Echo.
+
+## Catatan Pengembangan
+
+- Event real-time yang tersedia:
+  - `order.created`
+  - `order.status-updated`
+- Event akan tetap aman dijalankan meski broadcaster masih `log`.
