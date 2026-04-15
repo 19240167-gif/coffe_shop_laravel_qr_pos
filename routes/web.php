@@ -32,8 +32,14 @@ Route::post('/table/{token}/orders', [CustomerOrderController::class, 'store'])-
 
 Route::prefix('dashboard')->middleware(['auth', 'role:admin,cashier'])->group(function (): void {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard.index');
-    Route::post('/menu-items', [DashboardController::class, 'storeMenuItem'])->name('dashboard.menu-items.store');
-    Route::post('/table-seats', [DashboardController::class, 'storeTable'])->name('dashboard.table-seats.store');
+    Route::post('/menu-items', [DashboardController::class, 'storeMenuItem'])
+        ->middleware('role:admin')
+        ->name('dashboard.menu-items.store');
+    Route::post('/table-seats', [DashboardController::class, 'storeTable'])
+        ->middleware('role:admin')
+        ->name('dashboard.table-seats.store');
     Route::post('/orders/{order}/status', [DashboardController::class, 'updateOrderStatus'])->name('dashboard.orders.status');
-    Route::post('/menu-items/{menuItem}/stock', [DashboardController::class, 'adjustStock'])->name('dashboard.menu-items.stock');
+    Route::post('/menu-items/{menuItem}/stock', [DashboardController::class, 'adjustStock'])
+        ->middleware('role:admin')
+        ->name('dashboard.menu-items.stock');
 });

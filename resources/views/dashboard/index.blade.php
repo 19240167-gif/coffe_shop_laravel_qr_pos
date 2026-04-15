@@ -3,6 +3,10 @@
 @section('title', 'Dashboard Kasir')
 
 @section('content')
+    @php
+        $isAdmin = auth()->user()?->role === 'admin';
+    @endphp
+
     <section class="page-hero">
         <div>
             <h1>Dashboard Admin/Kasir</h1>
@@ -35,41 +39,46 @@
 
     <section class="grid grid-2" style="margin-bottom: 18px;">
         <article class="card">
-            <h2 class="section-title">Tambah Menu Baru</h2>
-            <form method="POST" action="{{ route('dashboard.menu-items.store') }}">
-                @csrf
-                <div class="field">
-                    <label for="menu-name">Nama Menu</label>
-                    <input id="menu-name" class="input" type="text" name="name" required>
-                </div>
-                <div class="field">
-                    <label for="menu-description">Deskripsi</label>
-                    <textarea id="menu-description" class="textarea" name="description" placeholder="Contoh: Kopi arabika, notes cokelat"></textarea>
-                </div>
-                <div class="grid grid-2">
+            @if ($isAdmin)
+                <h2 class="section-title">Tambah Menu Baru</h2>
+                <form method="POST" action="{{ route('dashboard.menu-items.store') }}">
+                    @csrf
                     <div class="field">
-                        <label for="menu-price">Harga</label>
-                        <input id="menu-price" class="input" type="number" name="price" min="0" step="100" required>
+                        <label for="menu-name">Nama Menu</label>
+                        <input id="menu-name" class="input" type="text" name="name" required>
                     </div>
                     <div class="field">
-                        <label for="menu-stock">Stok Awal</label>
-                        <input id="menu-stock" class="input" type="number" name="stock" min="0" required>
+                        <label for="menu-description">Deskripsi</label>
+                        <textarea id="menu-description" class="textarea" name="description" placeholder="Contoh: Kopi arabika, notes cokelat"></textarea>
                     </div>
-                </div>
-                <button class="btn btn-primary" type="submit">Simpan Menu</button>
-            </form>
+                    <div class="grid grid-2">
+                        <div class="field">
+                            <label for="menu-price">Harga</label>
+                            <input id="menu-price" class="input" type="number" name="price" min="0" step="100" required>
+                        </div>
+                        <div class="field">
+                            <label for="menu-stock">Stok Awal</label>
+                            <input id="menu-stock" class="input" type="number" name="stock" min="0" required>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" type="submit">Simpan Menu</button>
+                </form>
 
-            <hr style="border: 0; border-top: 1px solid var(--line); margin: 20px 0;">
+                <hr style="border: 0; border-top: 1px solid var(--line); margin: 20px 0;">
 
-            <h2 class="section-title">Tambah Meja QR</h2>
-            <form method="POST" action="{{ route('dashboard.table-seats.store') }}">
-                @csrf
-                <div class="field">
-                    <label for="table-code">Kode Meja</label>
-                    <input id="table-code" class="input" type="text" name="code" placeholder="Contoh: A1" required>
-                </div>
-                <button class="btn btn-soft" type="submit">Buat Meja</button>
-            </form>
+                <h2 class="section-title">Tambah Meja QR</h2>
+                <form method="POST" action="{{ route('dashboard.table-seats.store') }}">
+                    @csrf
+                    <div class="field">
+                        <label for="table-code">Kode Meja</label>
+                        <input id="table-code" class="input" type="text" name="code" placeholder="Contoh: A1" required>
+                    </div>
+                    <button class="btn btn-soft" type="submit">Buat Meja</button>
+                </form>
+            @else
+                <h2 class="section-title">Akses Kasir</h2>
+                <p class="muted">Akun kasir fokus pada pemrosesan order. Pengelolaan menu, stok, dan meja hanya untuk admin.</p>
+            @endif
 
             <p class="footer-note">
                 Link pelanggan: <span class="muted">/table/{qr_token}</span>
@@ -105,17 +114,21 @@
                                 <td>Rp{{ number_format($menuItem->price, 0, ',', '.') }}</td>
                                 <td>{{ $menuItem->stock }}</td>
                                 <td>
-                                    <form method="POST" action="{{ route('dashboard.menu-items.stock', $menuItem) }}" style="display: grid; gap: 8px;">
-                                        @csrf
-                                        <select class="select" name="type" required>
-                                            <option value="in">Tambah (+)</option>
-                                            <option value="out">Kurangi (-)</option>
-                                            <option value="adjustment">Set langsung</option>
-                                        </select>
-                                        <input class="input" type="number" name="quantity" min="1" placeholder="Jumlah" required>
-                                        <input class="input" type="text" name="note" placeholder="Catatan opsional">
-                                        <button class="btn btn-soft" type="submit">Simpan</button>
-                                    </form>
+                                    @if ($isAdmin)
+                                        <form method="POST" action="{{ route('dashboard.menu-items.stock', $menuItem) }}" style="display: grid; gap: 8px;">
+                                            @csrf
+                                            <select class="select" name="type" required>
+                                                <option value="in">Tambah (+)</option>
+                                                <option value="out">Kurangi (-)</option>
+                                                <option value="adjustment">Set langsung</option>
+                                            </select>
+                                            <input class="input" type="number" name="quantity" min="1" placeholder="Jumlah" required>
+                                            <input class="input" type="text" name="note" placeholder="Catatan opsional">
+                                            <button class="btn btn-soft" type="submit">Simpan</button>
+                                        </form>
+                                    @else
+                                        <span class="muted">Hanya admin</span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

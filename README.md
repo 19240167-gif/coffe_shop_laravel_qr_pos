@@ -71,6 +71,12 @@ Setelah `php artisan migrate --seed`:
 - Admin: `admin@beanflow.local` / `password`
 - Kasir: `kasir@beanflow.local` / `password`
 
+## Hak Akses Role
+
+- Admin: akses penuh dashboard termasuk tambah menu, tambah meja, dan penyesuaian stok.
+- Kasir: fokus operasional order (lihat order masuk dan update status/pembayaran).
+- Jika user tidak memiliki izin pada aksi tertentu, sistem akan menampilkan halaman `403`.
+
 ## Aktivasi Real-Time Pusher
 
 Secara default, `.env.example` memakai `BROADCAST_DRIVER=log` agar aman untuk lokal.
