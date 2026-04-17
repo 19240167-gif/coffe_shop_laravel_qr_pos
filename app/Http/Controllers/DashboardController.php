@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderCreated;
 use App\Events\OrderStatusUpdated;
 use App\Models\ActivityLog;
 use App\Models\MenuItem;
@@ -9,7 +10,9 @@ use App\Models\Order;
 use App\Models\TableSeat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
 class DashboardController extends Controller
@@ -145,6 +148,127 @@ class DashboardController extends Controller
             ->with('success', "Status {$freshOrder->order_number} berhasil diperbarui.");
     }
 
+    public function storeManualOrder(Request $request)
+    {
+        $validated = $request->validate([
+            'customer_name' => ['nullable', 'string', 'max:100'],
+            'customer_note' => ['nullable', 'string', 'max:500'],
+            'table_seat_id' => [
+                'nullable',
+                Rule::exists('table_seats', 'id')->where(fn ($query) => $query->where('is_active', true)),
+            ],
+            'items' => ['required', 'array'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:0'],
+            'items.*.notes' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $selectedItems = collect($validated['items'])
+            ->map(function (array $row, string $menuItemId): array {
+                return [
+                    'menu_item_id' => (int) $menuItemId,
+                    'quantity' => (int) ($row['quantity'] ?? 0),
+                    'notes' => $row['notes'] ?? null,
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['quantity'] > 0)
+            ->values();
+
+        if ($selectedItems->isEmpty()) {
+            return back()
+                ->withErrors(['items' => 'Pilih minimal satu menu dengan jumlah lebih dari 0 untuk order manual.'])
+                ->withInput();
+        }
+
+        $order = DB::transaction(function () use ($selectedItems, $validated) {
+            $menuItems = MenuItem::query()
+                ->whereIn('id', $selectedItems->pluck('menu_item_id'))
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            if ($menuItems->count() !== $selectedItems->count()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Salah satu menu tidak tersedia atau sedang nonaktif.',
+                ]);
+            }
+
+            $order = Order::query()->create([
+                'order_number' => $this->generateOrderNumber(),
+                'table_seat_id' => $validated['table_seat_id'] ?? null,
+                'handled_by' => auth()->id(),
+                'customer_name' => $validated['customer_name'] ?? null,
+                'customer_note' => $validated['customer_note'] ?? null,
+                'status' => 'pending',
+                'payment_status' => 'unpaid',
+                'ordered_at' => now(),
+            ]);
+
+            $subtotal = 0;
+
+            foreach ($selectedItems as $itemRow) {
+                /** @var \App\Models\MenuItem $menuItem */
+                $menuItem = $menuItems->get($itemRow['menu_item_id']);
+
+                if ($menuItem->stock < $itemRow['quantity']) {
+                    throw ValidationException::withMessages([
+                        'items' => "Stok {$menuItem->name} tidak mencukupi untuk order manual.",
+                    ]);
+                }
+
+                $lineTotal = $menuItem->price * $itemRow['quantity'];
+                $subtotal += $lineTotal;
+
+                $order->items()->create([
+                    'menu_item_id' => $menuItem->id,
+                    'menu_name' => $menuItem->name,
+                    'unit_price' => $menuItem->price,
+                    'quantity' => $itemRow['quantity'],
+                    'notes' => $itemRow['notes'],
+                    'line_total' => $lineTotal,
+                ]);
+
+                $menuItem->decrement('stock', $itemRow['quantity']);
+
+                $menuItem->stockMovements()->create([
+                    'user_id' => auth()->id(),
+                    'type' => 'out',
+                    'quantity' => $itemRow['quantity'],
+                    'note' => 'Pengurangan stok dari order manual kasir.',
+                    'reference_type' => Order::class,
+                    'reference_id' => $order->id,
+                    'occurred_at' => now(),
+                ]);
+            }
+
+            $order->update([
+                'subtotal' => $subtotal,
+                'tax' => 0,
+                'total' => $subtotal,
+            ]);
+
+            return $order->load('tableSeat', 'items');
+        });
+
+        OrderCreated::dispatch($order);
+
+        ActivityLog::record(
+            'order.created.manual',
+            "Order manual {$order->order_number} dibuat oleh kasir.",
+            $order,
+            [
+                'table' => $order->tableSeat?->code,
+                'items_count' => $order->items->count(),
+                'total' => (float) $order->total,
+            ],
+            auth()->id()
+        );
+
+        return redirect()
+            ->route('dashboard.index')
+            ->with('success', "Order manual {$order->order_number} berhasil dibuat.");
+    }
+
     public function adjustStock(Request $request, MenuItem $menuItem)
     {
         $validated = $request->validate([
@@ -252,5 +376,14 @@ class DashboardController extends Controller
         }
 
         return $slug;
+    }
+
+    private function generateOrderNumber(): string
+    {
+        do {
+            $number = 'ORD-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
+        } while (Order::query()->where('order_number', $number)->exists());
+
+        return $number;
     }
 }

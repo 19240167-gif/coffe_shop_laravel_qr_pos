@@ -33,6 +33,7 @@ Route::post('/table/{token}/orders', [CustomerOrderController::class, 'store'])-
 Route::prefix('dashboard')->middleware(['auth', 'role:admin,cashier'])->group(function (): void {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard.index');
     Route::get('/orders/{order}/card', [DashboardController::class, 'orderCard'])->name('dashboard.orders.card');
+    Route::post('/orders/manual', [DashboardController::class, 'storeManualOrder'])->name('dashboard.orders.manual.store');
     Route::post('/menu-items', [DashboardController::class, 'storeMenuItem'])
         ->middleware('role:admin')
         ->name('dashboard.menu-items.store');

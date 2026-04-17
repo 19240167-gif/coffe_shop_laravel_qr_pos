@@ -11,6 +11,7 @@ Aplikasi kasir restoran berbasis Laravel dengan dua antarmuka utama:
 - Manajemen stok: tambah, kurangi, dan set langsung (dengan histori pergerakan stok).
 - Manajemen meja: kode meja dan token QR unik otomatis.
 - Pemesanan pelanggan: pilih item, jumlah, catatan, kirim pesanan.
+- Order manual kasir: kasir dapat input pesanan langsung untuk pelanggan tanpa HP.
 - Workflow pesanan: pending, confirmed, preparing, ready, completed, cancelled.
 - Real-time ready: event pesanan baru dan perubahan status via broadcasting (Pusher-compatible).
 - Dashboard realtime tanpa reload: kartu order akan sinkron otomatis saat event baru masuk.
