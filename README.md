@@ -13,6 +13,8 @@ Aplikasi kasir restoran berbasis Laravel dengan dua antarmuka utama:
 - Pemesanan pelanggan: pilih item, jumlah, catatan, kirim pesanan.
 - Workflow pesanan: pending, confirmed, preparing, ready, completed, cancelled.
 - Real-time ready: event pesanan baru dan perubahan status via broadcasting (Pusher-compatible).
+- Dashboard realtime tanpa reload: kartu order akan sinkron otomatis saat event baru masuk.
+- Audit log aktivitas: jejak aksi penting user tersimpan dan tampil di dashboard.
 - UI responsive: layout mobile-first untuk pelanggan dan dashboard kasir.
 
 ## Struktur Domain Data
@@ -63,6 +65,7 @@ Buka:
 - Halaman login staf: `http://127.0.0.1:8000/login`
 - Dashboard kasir (butuh login): `http://127.0.0.1:8000/dashboard`
 - Link pelanggan per meja: tersedia di panel `Daftar Meja` pada dashboard
+- Print QR meja massal (admin): tombol `Print QR Massal` tersedia di panel `Daftar Meja`
 
 ## Demo Akun Seed
 

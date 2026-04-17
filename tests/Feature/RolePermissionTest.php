@@ -107,4 +107,27 @@ class RolePermissionTest extends TestCase
             'stock' => 20,
         ]);
     }
+
+    public function test_cashier_cannot_access_bulk_qr_print_page(): void
+    {
+        $cashier = User::factory()->create([
+            'role' => 'cashier',
+        ]);
+
+        $response = $this->actingAs($cashier)->get('/dashboard/table-seats/print');
+
+        $response->assertForbidden();
+    }
+
+    public function test_admin_can_access_bulk_qr_print_page(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $response = $this->actingAs($admin)->get('/dashboard/table-seats/print');
+
+        $response->assertOk();
+        $response->assertSee('Cetak QR Meja Massal');
+    }
 }

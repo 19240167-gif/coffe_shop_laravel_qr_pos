@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Events\OrderStatusUpdated;
+use App\Models\ActivityLog;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\TableSeat;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
@@ -23,6 +25,12 @@ class DashboardController extends Controller
 
         $menuItems = MenuItem::query()->orderBy('name')->get();
         $tableSeats = TableSeat::query()->orderBy('code')->get();
+        $activityLogs = ActivityLog::query()
+            ->with('user')
+            ->latest('occurred_at')
+            ->latest('id')
+            ->limit(12)
+            ->get();
 
         $summary = [
             'today_revenue' => Order::query()
@@ -38,6 +46,7 @@ class DashboardController extends Controller
             'orders' => $orders,
             'menuItems' => $menuItems,
             'tableSeats' => $tableSeats,
+            'activityLogs' => $activityLogs,
             'summary' => $summary,
         ]);
     }
@@ -52,7 +61,7 @@ class DashboardController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        MenuItem::query()->create([
+        $menuItem = MenuItem::query()->create([
             'name' => $validated['name'],
             'slug' => $this->generateUniqueSlug($validated['name']),
             'description' => $validated['description'] ?? null,
@@ -60,6 +69,17 @@ class DashboardController extends Controller
             'stock' => $validated['stock'],
             'is_active' => (bool) ($validated['is_active'] ?? true),
         ]);
+
+        ActivityLog::record(
+            'menu.created',
+            "Menu {$menuItem->name} ditambahkan.",
+            $menuItem,
+            [
+                'price' => (float) $menuItem->price,
+                'stock' => $menuItem->stock,
+            ],
+            auth()->id()
+        );
 
         return redirect()
             ->route('dashboard.index')
@@ -73,10 +93,20 @@ class DashboardController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        TableSeat::query()->create([
+        $tableSeat = TableSeat::query()->create([
             'code' => strtoupper($validated['code']),
             'is_active' => (bool) ($validated['is_active'] ?? true),
         ]);
+
+        ActivityLog::record(
+            'table.created',
+            "Meja {$tableSeat->code} ditambahkan.",
+            $tableSeat,
+            [
+                'qr_token' => $tableSeat->qr_token,
+            ],
+            auth()->id()
+        );
 
         return redirect()
             ->route('dashboard.index')
@@ -99,6 +129,17 @@ class DashboardController extends Controller
         $freshOrder = $order->fresh(['tableSeat', 'items']);
         OrderStatusUpdated::dispatch($freshOrder);
 
+        ActivityLog::record(
+            'order.status_updated',
+            "Order {$freshOrder->order_number} diperbarui menjadi {$freshOrder->status}.",
+            $freshOrder,
+            [
+                'status' => $freshOrder->status,
+                'payment_status' => $freshOrder->payment_status,
+            ],
+            auth()->id()
+        );
+
         return redirect()
             ->route('dashboard.index')
             ->with('success', "Status {$freshOrder->order_number} berhasil diperbarui.");
@@ -112,6 +153,7 @@ class DashboardController extends Controller
             'note' => ['nullable', 'string', 'max:150'],
         ]);
 
+        $previousStock = $menuItem->stock;
         $newStock = $menuItem->stock;
 
         if ($validated['type'] === 'in') {
@@ -142,9 +184,60 @@ class DashboardController extends Controller
             'occurred_at' => now(),
         ]);
 
+        ActivityLog::record(
+            'menu.stock_adjusted',
+            "Stok {$menuItem->name} diperbarui ({$validated['type']}).",
+            $menuItem,
+            [
+                'type' => $validated['type'],
+                'quantity' => $validated['quantity'],
+                'from' => $previousStock,
+                'to' => $newStock,
+            ],
+            auth()->id()
+        );
+
         return redirect()
             ->route('dashboard.index')
             ->with('success', "Stok {$menuItem->name} berhasil diperbarui.");
+    }
+
+    public function orderCard(Order $order): JsonResponse
+    {
+        $order->loadMissing(['tableSeat', 'items']);
+
+        $searchBlob = strtolower(trim($order->order_number . ' ' . ($order->tableSeat?->code ?? '') . ' ' . ($order->customer_name ?? '')));
+
+        $html = view('dashboard.partials.order-card', [
+            'order' => $order,
+            'searchBlob' => $searchBlob,
+        ])->render();
+
+        return response()->json([
+            'id' => $order->id,
+            'status' => $order->status,
+            'search_blob' => $searchBlob,
+            'html' => $html,
+        ]);
+    }
+
+    public function printTableSeats()
+    {
+        $tableSeats = TableSeat::query()->orderBy('code')->get();
+
+        ActivityLog::record(
+            'table.print_qr',
+            'Membuka halaman cetak QR meja massal.',
+            null,
+            [
+                'tables_count' => $tableSeats->count(),
+            ],
+            auth()->id()
+        );
+
+        return view('dashboard.print-table-seats', [
+            'tableSeats' => $tableSeats,
+        ]);
     }
 
     private function generateUniqueSlug(string $name): string

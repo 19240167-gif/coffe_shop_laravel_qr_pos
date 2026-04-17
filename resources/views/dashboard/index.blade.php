@@ -5,6 +5,7 @@
 @section('content')
     @php
         $isAdmin = auth()->user()?->role === 'admin';
+        $roleLabel = strtoupper((string) auth()->user()?->role);
     @endphp
 
     <section class="page-hero">
@@ -13,6 +14,7 @@
             <p>Pusat kontrol menu, stok, pesanan, dan monitoring operasional restoran.</p>
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <span class="badge">Role: {{ $roleLabel }}</span>
             <span class="badge">Pusher-ready</span>
             <span class="badge">Realtime Orders</span>
         </div>
@@ -38,6 +40,28 @@
     </section>
 
     <section class="grid grid-2" style="margin-bottom: 18px;">
+        <article class="card">
+            <div class="section-bar">
+                <h2 class="section-title" style="margin: 0;">Aktivitas Sistem</h2>
+                <span class="badge">Audit Log</span>
+            </div>
+
+            <div class="activity-feed">
+                @forelse ($activityLogs as $activityLog)
+                    <article class="activity-item">
+                        <div class="activity-head">
+                            <span class="badge activity-action">{{ $activityLog->action }}</span>
+                            <small class="muted">{{ optional($activityLog->occurred_at)->format('d M Y H:i') }}</small>
+                        </div>
+                        <p>{{ $activityLog->description }}</p>
+                        <small class="muted">User: {{ $activityLog->user?->name ?? 'System' }}</small>
+                    </article>
+                @empty
+                    <p class="muted">Belum ada aktivitas tercatat.</p>
+                @endforelse
+            </div>
+        </article>
+
         <article class="card">
             @if ($isAdmin)
                 <h2 class="section-title">Tambah Menu Baru</h2>
@@ -158,61 +182,29 @@
         </div>
 
         <div style="margin-top: 12px;" id="orders-list">
-            @forelse ($orders as $order)
+            <p id="orders-no-data" class="muted" style="{{ $orders->isEmpty() ? '' : 'display: none;' }}">Belum ada pesanan yang masuk.</p>
+
+            @foreach ($orders as $order)
                 @php
-                    $statusClass = 'status-' . $order->status;
                     $searchBlob = strtolower(trim($order->order_number . ' ' . ($order->tableSeat?->code ?? '') . ' ' . ($order->customer_name ?? '')));
                 @endphp
-                <article class="order-card js-order-card" data-status="{{ $order->status }}" data-search="{{ $searchBlob }}">
-                    <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                        <div>
-                            <strong>{{ $order->order_number }}</strong>
-                            <div class="muted">Meja: {{ $order->tableSeat?->code ?? '-' }} | {{ optional($order->ordered_at)->format('d M Y H:i') }}</div>
-                        </div>
-                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <span class="status-pill {{ $statusClass }}">{{ $order->status }}</span>
-                            <span class="badge">{{ $order->payment_status }}</span>
-                            <strong>Rp{{ number_format($order->total, 0, ',', '.') }}</strong>
-                        </div>
-                    </div>
+                @include('dashboard.partials.order-card', ['order' => $order, 'searchBlob' => $searchBlob])
+            @endforeach
 
-                    <ul class="list-clean" style="margin-top: 10px;">
-                        @foreach ($order->items as $item)
-                            <li>
-                                <span>{{ $item->menu_name }} x{{ $item->quantity }}</span>
-                                <span>Rp{{ number_format($item->line_total, 0, ',', '.') }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
-
-                    <form method="POST" action="{{ route('dashboard.orders.status', $order) }}" style="margin-top: 10px;" class="grid grid-3">
-                        @csrf
-                        <select class="select" name="status" required>
-                            @foreach (['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'] as $status)
-                                <option value="{{ $status }}" {{ $order->status === $status ? 'selected' : '' }}>
-                                    {{ strtoupper($status) }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <select class="select" name="payment_status" required>
-                            @foreach (['unpaid', 'paid'] as $payment)
-                                <option value="{{ $payment }}" {{ $order->payment_status === $payment ? 'selected' : '' }}>
-                                    {{ strtoupper($payment) }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <button class="btn btn-primary" type="submit">Update Status</button>
-                    </form>
-                </article>
-            @empty
-                <p class="muted">Belum ada pesanan yang masuk.</p>
-            @endforelse
             <p id="orders-empty-state" class="muted" style="display: none;">Tidak ada pesanan yang cocok dengan filter.</p>
         </div>
     </section>
 
     <section class="card" style="margin-top: 18px;">
-        <h2 class="section-title">Daftar Meja</h2>
+        <div class="section-bar">
+            <h2 class="section-title" style="margin: 0;">Daftar Meja</h2>
+            @if ($isAdmin)
+                <a class="btn btn-soft btn-xs" href="{{ route('dashboard.table-seats.print') }}" target="_blank" rel="noopener noreferrer">
+                    Print QR Massal
+                </a>
+            @endif
+        </div>
+
         <div class="table-wrap">
             <table>
                 <thead>
@@ -256,7 +248,10 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const orderCardRouteTemplate = @json(route('dashboard.orders.card', ['order' => '__ORDER_ID__']));
             const toastStack = document.getElementById('toast-stack');
+            const ordersList = document.getElementById('orders-list');
+            const noDataState = document.getElementById('orders-no-data');
             const createToast = (message, type) => {
                 if (!toastStack) {
                     return;
@@ -275,6 +270,16 @@
                 }, 3200);
             };
 
+            const getOrderCards = () => Array.from(document.querySelectorAll('.js-order-card'));
+
+            const syncNoDataState = () => {
+                if (!noDataState) {
+                    return;
+                }
+
+                noDataState.style.display = getOrderCards().length === 0 ? '' : 'none';
+            };
+
             const menuSearchInput = document.getElementById('menu-search');
             const menuRows = Array.from(document.querySelectorAll('.js-menu-row'));
 
@@ -289,13 +294,13 @@
                 });
             }
 
-            const orderCards = Array.from(document.querySelectorAll('.js-order-card'));
             const orderFilterButtons = Array.from(document.querySelectorAll('.order-filter-btn'));
             const orderSearchInput = document.getElementById('order-search');
             const emptyOrderState = document.getElementById('orders-empty-state');
             let activeFilter = 'all';
 
             const applyOrderFilter = () => {
+                const orderCards = getOrderCards();
                 const keyword = (orderSearchInput ? orderSearchInput.value : '').toLowerCase().trim();
                 let visibleCount = 0;
 
@@ -316,6 +321,46 @@
                 }
             };
 
+            const upsertOrderCard = async (orderId, mode = 'prepend') => {
+                if (!ordersList || !orderId) {
+                    return;
+                }
+
+                const endpoint = orderCardRouteTemplate.replace('__ORDER_ID__', String(orderId));
+                const response = await fetch(endpoint, {
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Gagal mengambil snapshot order realtime.');
+                }
+
+                const payload = await response.json();
+                const holder = document.createElement('div');
+                holder.innerHTML = String(payload.html || '').trim();
+
+                const nextCard = holder.firstElementChild;
+
+                if (!nextCard) {
+                    return;
+                }
+
+                const existing = ordersList.querySelector('[data-order-id="' + String(orderId) + '"]');
+
+                if (existing) {
+                    existing.replaceWith(nextCard);
+                } else if (mode === 'prepend') {
+                    ordersList.prepend(nextCard);
+                } else {
+                    ordersList.appendChild(nextCard);
+                }
+
+                syncNoDataState();
+                applyOrderFilter();
+            };
+
             orderFilterButtons.forEach(function (button) {
                 button.addEventListener('click', function () {
                     activeFilter = button.dataset.filter;
@@ -333,6 +378,7 @@
                 orderSearchInput.addEventListener('input', applyOrderFilter);
             }
 
+            syncNoDataState();
             applyOrderFilter();
 
             document.querySelectorAll('.copy-url-btn').forEach(function (button) {
@@ -353,17 +399,23 @@
             }
 
             window.Echo.channel('orders')
-                .listen('.order.created', function (payload) {
+                .listen('.order.created', async function (payload) {
                     createToast('Order baru masuk: ' + (payload.order_number || 'Baru'), 'success');
-                    window.setTimeout(function () {
-                        window.location.reload();
-                    }, 1400);
+
+                    try {
+                        await upsertOrderCard(payload.id, 'prepend');
+                    } catch (error) {
+                        createToast('Realtime sinkronisasi order baru gagal.', 'error');
+                    }
                 })
-                .listen('.order.status-updated', function (payload) {
+                .listen('.order.status-updated', async function (payload) {
                     createToast('Status diperbarui: ' + (payload.order_number || 'Order'), 'info');
-                    window.setTimeout(function () {
-                        window.location.reload();
-                    }, 1200);
+
+                    try {
+                        await upsertOrderCard(payload.id, 'append');
+                    } catch (error) {
+                        createToast('Realtime sinkronisasi status order gagal.', 'error');
+                    }
                 });
         });
     </script>

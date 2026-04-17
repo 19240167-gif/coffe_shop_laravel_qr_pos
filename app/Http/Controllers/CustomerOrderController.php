@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\OrderCreated;
+use App\Models\ActivityLog;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\TableSeat;
@@ -128,6 +129,17 @@ class CustomerOrderController extends Controller
 
             return $order->load('tableSeat', 'items');
         });
+
+        ActivityLog::record(
+            'order.created.customer',
+            "Order {$order->order_number} dibuat dari meja {$tableSeat->code}.",
+            $order,
+            [
+                'table' => $tableSeat->code,
+                'items_count' => $order->items->count(),
+                'total' => (float) $order->total,
+            ]
+        );
 
         OrderCreated::dispatch($order);
 

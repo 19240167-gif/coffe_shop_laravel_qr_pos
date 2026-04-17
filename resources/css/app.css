@@ -274,6 +274,15 @@ a {
 	font-size: 1.2rem;
 }
 
+.section-bar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+}
+
 .field {
 	display: grid;
 	gap: 8px;
@@ -601,6 +610,42 @@ td {
 	padding: 7px 10px;
 	font-size: 0.74rem;
 	width: fit-content;
+}
+
+.activity-feed {
+	display: grid;
+	gap: 10px;
+	max-height: 332px;
+	overflow: auto;
+	padding-right: 4px;
+}
+
+.activity-item {
+	border: 1px solid rgba(125, 61, 34, 0.18);
+	border-radius: 14px;
+	padding: 10px 12px;
+	background: rgba(255, 255, 255, 0.8);
+}
+
+.activity-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 5px;
+}
+
+.activity-action {
+	font-size: 0.65rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.activity-item p {
+	margin: 0 0 5px;
+	font-size: 0.84rem;
 }
 
 .auth-wrap {
